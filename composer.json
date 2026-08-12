@@ -1,0 +1,8 @@
+{
+  "name": "hackviewer/hackviewer",
+  "description": "A source-attributed hackathon discovery dashboard",
+  "type": "project",
+  "require": {
+    "php": ">=8.2"
+  }
+}

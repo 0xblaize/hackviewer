@@ -1,0 +1,68 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+$command = $argv[1] ?? null;
+
+if ($command === 'sorsa:batch') {
+    require_once __DIR__ . '/app/Bootstrap.php';
+    require_once __DIR__ . '/app/Database.php';
+
+    $date = (new DateTimeImmutable('now', new DateTimeZone((string) config('timezone', 'UTC'))))->format('Y-m-d');
+    $force = false;
+    foreach (array_slice($argv, 2) as $argument) {
+        if (str_starts_with($argument, '--date=')) {
+            $date = substr($argument, 7);
+        } elseif ($argument === '--force') {
+            $force = true;
+        }
+    }
+
+    $queries = config('sorsa_batch_queries', []);
+    if (!is_array($queries)) {
+        fwrite(STDERR, "SORSA_BATCH_QUERIES must be a JSON array.\n");
+        exit(1);
+    }
+
+    try {
+        $runner = new App\Services\SorsaBatchRunner(App\Database::connection());
+        $result = $runner->run($date, $queries, $force);
+        fwrite(STDOUT, 'Sorsa batch ' . $result['status'] . ' for ' . $date . ".\n");
+        exit(0);
+    } catch (Throwable $error) {
+        fwrite(STDERR, $error->getMessage() . "\n");
+        exit(1);
+    }
+}
+
+if ($command !== 'serve') {
+    fwrite(STDERR, "Hackview artisan commands:\n  php artisan serve [--host=127.0.0.1] [--port=8000]\n  php artisan sorsa:batch [--date=YYYY-MM-DD] [--force]\n");
+    exit(1);
+}
+
+$host = '127.0.0.1';
+$port = '8000';
+
+foreach (array_slice($argv, 2) as $argument) {
+    if (str_starts_with($argument, '--host=')) {
+        $host = substr($argument, 7);
+    }
+    if (str_starts_with($argument, '--port=')) {
+        $port = substr($argument, 7);
+    }
+}
+
+if (!preg_match('/^[a-zA-Z0-9.:-]+$/', $host) || !preg_match('/^[0-9]{1,5}$/', $port)) {
+    fwrite(STDERR, "Invalid host or port.\n");
+    exit(1);
+}
+
+$root = __DIR__;
+$public = $root . DIRECTORY_SEPARATOR . 'public';
+$php = PHP_BINARY;
+$commandLine = escapeshellarg($php) . ' -S ' . escapeshellarg($host . ':' . $port) . ' -t ' . escapeshellarg($public);
+
+fwrite(STDOUT, "Hackview server running at http://{$host}:{$port}\n");
+ passthru($commandLine, $exitCode);
+exit($exitCode);

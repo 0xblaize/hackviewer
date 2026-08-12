@@ -1,0 +1,69 @@
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+!.env.example.*
+
+# Local databases and SQLite sidecar files
+database/*.sqlite
+database/*.sqlite3
+database/*.db
+database/*.db3
+database/*.sqlite-*
+database/*.db-*
+
+# Runtime storage and ingestion payloads
+storage/raw/*
+storage/logs/*
+storage/cache/*
+storage/tmp/*
+
+# Keep runtime directories available after cloning
+!storage/raw/.gitkeep
+!storage/logs/.gitkeep
+!storage/cache/.gitkeep
+!storage/tmp/.gitkeep
+
+# Dependency directories
+/vendor/
+
+# Test and coverage output
+.phpunit.result.cache
+.phpunit.cache/
+coverage/
+clover.xml
+
+# PHP and application logs
+*.log
+error_log
+
+# Operating system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows explorer and shell artifacts
+Desktop.ini
+$RECYCLE.BIN/
+
+# Editor and IDE files
+.idea/
+.vscode/
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# Local tooling and temporary files
+.php-cs-fixer.cache
+.phpstan.cache
+.phpstan.neon.tmp
+.tmp/
+tmp/
+temp/

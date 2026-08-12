@@ -135,6 +135,81 @@ php bin/discover-x.php "(hackathon OR buildathon) (prize OR prizes) -is:retweet 
 
 X posts are stored in `discovery_candidates`, not directly as hackathons. A post is only a lead. An official event page must be found and checked before it can become a verified listing.
 
+### Sorsa X search
+
+Sorsa's documented endpoint is a `POST` request to:
+
+```text
+https://api.sorsa.io/v3/search-tweets
+```
+
+The request uses the `ApiKey` header. Add your own Sorsa key to `.env`:
+
+```env
+SORSA_API_KEY=your_sorsa_key_here
+SORSA_SEARCH_ENDPOINT_URL=https://api.sorsa.io/v3/search-tweets
+SORSA_SEARCH_QUERY_FIELD=query
+```
+
+Search a keyword:
+
+```bash
+php bin/search-sorsa.php hackathon
+php bin/search-sorsa.php "hackathon prizes"
+```
+
+The public documentation confirms the endpoint and header, but does not publish the JSON body field or response schema in the fetched specification. Hackview defaults to `{ "query": "..." }`; set `SORSA_SEARCH_QUERY_FIELD` to the exact field documented for your Sorsa account if different. Returned posts are stored as unreviewed candidates and never become verified hackathons automatically. Never put your Sorsa key in source code or share it in chat.
+
+### Daily Sorsa batch
+
+Configure several searches in `.env`:
+
+```env
+SORSA_BATCH_QUERIES=["hackathon","buildathon","hackathon prizes","hackathon applications","developer competition"]
+```
+
+Run the batch manually:
+
+```bash
+php artisan sorsa:batch
+```
+
+A completed batch is allowed only once per calendar date. To retry a failed or partial batch:
+
+```bash
+php artisan sorsa:batch --force
+```
+
+Each query is saved with its own raw response and audit record. Duplicate posts across queries are stored once, and existing candidate review status is preserved.
+
+#### Windows Task Scheduler
+
+Create a daily task at **12:00 AM**:
+
+- **Program:** the absolute path to `php.exe`, such as `C:\\php\\php.exe`
+- **Arguments:** `artisan sorsa:batch`
+- **Start in:** `C:\\Users\\USER\\hackviewer`
+- Enable task history and prevent overlapping runs.
+- Make sure the task account can read `.env`, write `database/app.sqlite`, and write `storage/raw`.
+- Do not put the Sorsa key in the task arguments.
+
+Test the same command from Command Prompt first:
+
+```cmd
+cd /d C:\Users\USER\hackviewer
+php artisan sorsa:batch
+```
+
+#### Linux/macOS cron
+
+Run at midnight using an absolute PHP path:
+
+```cron
+0 0 * * * cd /path/to/hackviewer && /usr/bin/php artisan sorsa:batch >> storage/logs/sorsa-batch.log 2>&1
+```
+
+The batch uses the application timezone for its calendar date, saves successful query results when another query fails, and refuses to repeat a completed date.
+
 ## Supported platform registry
 
 Hackview recognizes these platforms:
