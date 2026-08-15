@@ -1,0 +1,5 @@
+import Link from 'next/link';
+
+export default function Shell({ children }: { children: React.ReactNode }) {
+  return <div className="app-shell"><header className="topbar"><Link className="brand" href="/" aria-label="Hackview home"><span className="brand-mark">H</span><span>hackview<span className="brand-dot">.</span></span></Link><div className="topbar-meta"><span className="live-dot" /> Tracking verified opportunities <span className="meta-separator">·</span> <Link href="/candidates">Review candidates</Link> <span className="meta-separator">·</span> UTC</div></header><main>{children}</main><footer className="footer"><span>Built for people who want to find the right room before it gets crowded.</span><span>Sources are always linked and freshness is visible.</span></footer></div>;
+}

@@ -32,6 +32,7 @@ function config(string $key, mixed $default = null): mixed
             ],
             'review_username' => null,
             'review_password' => null,
+            'review_api_token' => null,
         ];
 
         $envPath = appRoot() . DIRECTORY_SEPARATOR . '.env';
@@ -53,6 +54,7 @@ function config(string $key, mixed $default = null): mixed
             'database_path',
             'review_username',
             'review_password',
+            'review_api_token',
             'x_bearer_token',
             'x_api_base_url',
             'x_search_query',
