@@ -75,7 +75,7 @@ php artisan serve --port=8010
 You can also use PHP directly:
 
 ```bash
-php -S 127.0.0.1:8000 -t public
+php -S 127.0.0.1:8000 -t public public/index.php
 ```
 
 Open the displayed address in your browser. The dashboard intentionally starts with an honest empty state until real records are ingested.
@@ -184,12 +184,24 @@ Each query is saved with its own raw response and audit record. Duplicate posts 
 
 #### Windows Task Scheduler
 
-Create a daily task at **12:00 AM**:
+The project includes a registration script that creates a daily task at **12:00 AM** without exposing `.env` secrets:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\\bin\\register-sorsa-task.ps1 -PhpPath C:\\php\\php.exe
+```
+
+By default, the script uses the project directory as the working directory, prevents overlapping runs, and gives each run a two-hour limit. Remove the task with:
+
+```powershell
+.\\bin\\register-sorsa-task.ps1 -Remove
+```
+
+The equivalent manual task settings are:
 
 - **Program:** the absolute path to `php.exe`, such as `C:\\php\\php.exe`
 - **Arguments:** `artisan sorsa:batch`
 - **Start in:** `C:\\Users\\USER\\hackviewer`
-- Enable task history and prevent overlapping runs.
 - Make sure the task account can read `.env`, write `database/app.sqlite`, and write `storage/raw`.
 - Do not put the Sorsa key in the task arguments.
 
@@ -310,6 +322,7 @@ bin/
   discover.php       Run configured platform sources
   discover-x.php     Discover public X posts
   verify.php         Run verification checks
+  register-sorsa-task.ps1  Register/remove midnight Sorsa task
   prune.php          Remove old raw database records
 public/
   index.php          Web front controller

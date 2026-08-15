@@ -19,6 +19,12 @@ final class SorsaSearchAdapter
     /** @return iterable<array<string, mixed>> */
     public function fetch(): iterable
     {
+        return $this->fetchResponse()['records'];
+    }
+
+    /** @return array{records: list<array<string, mixed>>, raw_body: string, http_status: int, content_type: string} */
+    public function fetchResponse(): array
+    {
         if ($this->apiKey === '') {
             throw new RuntimeException('SORSA_API_KEY is not configured.');
         }
@@ -39,13 +45,16 @@ final class SorsaSearchAdapter
             'content' => $body,
         ]]);
         $payload = @file_get_contents($this->endpoint, false, $context);
-        $status = $this->responseStatus($http_response_header ?? []);
+        $responseHeaders = $http_response_header ?? [];
+        $status = $this->responseStatus($responseHeaders);
+        $contentType = $this->headerValue($responseHeaders, 'content-type');
+        $rawBody = $payload === false ? '' : $payload;
         if ($payload === false || $status >= 400) {
             $message = $this->errorMessage($payload);
-            throw new RuntimeException("Sorsa search failed with HTTP {$status}" . ($message !== '' ? ": {$message}" : '.') );
+            throw new RuntimeException("Sorsa search failed with HTTP {$status}" . ($message !== '' ? ": {$message}" : '.'));
         }
 
-        $decoded = json_decode($payload, true);
+        $decoded = json_decode($rawBody, true);
         if (!is_array($decoded)) {
             throw new RuntimeException('Sorsa search response was not valid JSON.');
         }
@@ -57,7 +66,7 @@ final class SorsaSearchAdapter
                 break;
             }
         }
-
+        $records = [];
         foreach ($items as $item) {
             if (!is_array($item)) {
                 continue;
@@ -71,7 +80,7 @@ final class SorsaSearchAdapter
             if ($url === '') {
                 $url = "https://x.com/i/web/status/{$id}";
             }
-            yield [
+            $records[] = [
                 'external_key' => $id,
                 'post_url' => $url,
                 'author_handle' => ltrim((string) ($item['author_username'] ?? $item['username'] ?? $item['handle'] ?? ''), '@'),
@@ -80,6 +89,8 @@ final class SorsaSearchAdapter
                 'engagement' => is_array($item['public_metrics'] ?? null) ? $item['public_metrics'] : [],
             ];
         }
+
+        return ['records' => $records, 'raw_body' => $rawBody, 'http_status' => $status, 'content_type' => $contentType];
     }
 
     private function responseStatus(array $headers): int
@@ -90,6 +101,16 @@ final class SorsaSearchAdapter
             }
         }
         return 0;
+    }
+
+    private function headerValue(array $headers, string $name): string
+    {
+        foreach ($headers as $header) {
+            if (str_starts_with(strtolower($header), strtolower($name) . ':')) {
+                return trim(substr($header, strlen($name) + 1));
+            }
+        }
+        return '';
     }
 
     private function errorMessage(false|string $payload): string

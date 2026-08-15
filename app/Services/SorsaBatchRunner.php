@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Database;
 use App\Sources\SorsaSearchAdapter;
+use DateTimeImmutable;
 use PDO;
 use RuntimeException;
 use Throwable;
@@ -19,10 +20,22 @@ final class SorsaBatchRunner
     /** @return array<string, mixed> */
     public function run(string $batchDate, array $queries, bool $force = false): array
     {
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $batchDate)) {
-            throw new RuntimeException('Batch date must use YYYY-MM-DD.');
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $batchDate);
+        $dateErrors = DateTimeImmutable::getLastErrors();
+        if ($date === false || ($dateErrors !== false && ($dateErrors['warning_count'] > 0 || $dateErrors['error_count'] > 0)) || $date->format('Y-m-d') !== $batchDate) {
+            throw new RuntimeException('Batch date must be a valid calendar date in YYYY-MM-DD format.');
         }
-        $queries = array_values(array_unique(array_filter(array_map('trim', $queries), static fn (mixed $query): bool => is_string($query) && $query !== '')));
+        $normalizedQueries = [];
+        foreach ($queries as $query) {
+            if (!is_string($query)) {
+                continue;
+            }
+            $query = trim($query);
+            if ($query !== '') {
+                $normalizedQueries[] = $query;
+            }
+        }
+        $queries = array_values(array_unique($normalizedQueries));
         if ($queries === []) {
             throw new RuntimeException('SORSA_BATCH_QUERIES must contain at least one query.');
         }
@@ -30,6 +43,8 @@ final class SorsaBatchRunner
             throw new RuntimeException('SORSA_BATCH_QUERIES cannot contain more than 20 queries.');
         }
 
+        $skipOrdinals = [];
+        $baseTotals = ['fetched_count' => 0, 'created_count' => 0, 'updated_count' => 0, 'duplicate_count' => 0];
         $this->pdo->exec('BEGIN IMMEDIATE');
         try {
             $existing = $this->pdo->prepare('SELECT * FROM sorsa_batches WHERE batch_date = ?');
@@ -40,18 +55,33 @@ final class SorsaBatchRunner
                     $this->pdo->commit();
                     return ['status' => 'already-complete', 'batch_date' => $batchDate, 'fetched_count' => (int) $batch['fetched_count']];
                 }
-                if (!$force || $batch['status'] === 'running') {
+                if (!$force) {
                     $this->pdo->rollBack();
-                    throw new RuntimeException($batch['status'] === 'running' ? 'A Sorsa batch is already running for this date.' : 'This Sorsa batch is incomplete; use --force to retry it.');
+                    throw new RuntimeException($batch['status'] === 'running' ? 'A Sorsa batch is already running for this date; use --force only to recover a stale run.' : 'This Sorsa batch is incomplete; use --force to retry it.');
                 }
-                $this->pdo->prepare('DELETE FROM sorsa_batch_queries WHERE batch_id = ?')->execute([(int) $batch['id']]);
-                $this->pdo->prepare('DELETE FROM sorsa_batches WHERE id = ?')->execute([(int) $batch['id']]);
+                $batchId = (int) $batch['id'];
+                if ($batch['status'] !== 'running') {
+                    $completed = $this->pdo->prepare("SELECT query_ordinal FROM sorsa_batch_queries WHERE batch_id = ? AND status = 'complete'");
+                    $completed->execute([$batchId]);
+                    foreach ($completed->fetchAll(PDO::FETCH_COLUMN) as $ordinal) {
+                        $skipOrdinals[(int) $ordinal] = true;
+                    }
+                    $baseTotals = [
+                        'fetched_count' => (int) $batch['fetched_count'],
+                        'created_count' => (int) $batch['created_count'],
+                        'updated_count' => (int) $batch['updated_count'],
+                        'duplicate_count' => (int) $batch['duplicate_count'],
+                    ];
+                    $this->pdo->prepare("DELETE FROM sorsa_batch_queries WHERE batch_id = ? AND status != 'complete'")->execute([$batchId]);
+                } else {
+                    $this->pdo->prepare('DELETE FROM sorsa_batch_queries WHERE batch_id = ?')->execute([$batchId]);
+                }
+                $this->pdo->prepare('UPDATE sorsa_batches SET status = ?, started_at = ?, finished_at = NULL, error_count = 0, error_message = NULL WHERE id = ?')->execute(['running', gmdate('c'), $batchId]);
+            } else {
+                $insert = $this->pdo->prepare('INSERT INTO sorsa_batches (batch_date, status, started_at) VALUES (?, ?, ?)');
+                $insert->execute([$batchDate, 'running', gmdate('c')]);
+                $batchId = (int) $this->pdo->lastInsertId();
             }
-
-            $now = gmdate('c');
-            $insert = $this->pdo->prepare('INSERT INTO sorsa_batches (batch_date, status, started_at) VALUES (?, ?, ?)');
-            $insert->execute([$batchDate, 'running', $now]);
-            $batchId = (int) $this->pdo->lastInsertId();
             $this->pdo->commit();
         } catch (Throwable $error) {
             if ($this->pdo->inTransaction()) {
@@ -68,27 +98,34 @@ final class SorsaBatchRunner
             throw new RuntimeException('SORSA_API_KEY is not configured.');
         }
 
-        $totals = ['fetched_count' => 0, 'created_count' => 0, 'updated_count' => 0, 'duplicate_count' => 0, 'error_count' => 0];
+        $sourceId = $this->sourceId($endpoint);
+        $totals = $baseTotals + ['error_count' => 0];
         $batchSeen = [];
         foreach ($queries as $ordinal => $query) {
+            if (isset($skipOrdinals[$ordinal + 1])) {
+                continue;
+            }
             $queryStarted = gmdate('c');
             $queryInsert = $this->pdo->prepare('INSERT INTO sorsa_batch_queries (batch_id, query_ordinal, query_text, status, started_at) VALUES (?, ?, ?, ?, ?)');
             $queryInsert->execute([$batchId, $ordinal + 1, $query, 'running', $queryStarted]);
             $queryId = (int) $this->pdo->lastInsertId();
             try {
                 $adapter = new SorsaSearchAdapter($apiKey, $query, $endpoint, $queryField);
-                $records = iterator_to_array($adapter->fetch());
-                $raw = json_encode($records, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-                $hash = hash('sha256', (string) $raw);
+                $response = $adapter->fetchResponse();
+                $records = $response['records'];
+                $raw = $response['raw_body'];
+                $hash = hash('sha256', $raw);
                 $relativePath = 'sorsa-search/batches/' . $batchDate . '-' . ($ordinal + 1) . '-' . $hash . '.json';
                 $absolutePath = appRoot() . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'raw' . DIRECTORY_SEPARATOR . $relativePath;
-                if (!is_dir(dirname($absolutePath))) {
-                    mkdir(dirname($absolutePath), 0775, true);
+                if (!is_dir(dirname($absolutePath)) && !mkdir(dirname($absolutePath), 0775, true) && !is_dir(dirname($absolutePath))) {
+                    throw new RuntimeException('Unable to create Sorsa raw payload directory.');
                 }
-                file_put_contents($absolutePath, (string) $raw, LOCK_EX);
-                $sourceId = $this->sourceId($endpoint);
+                if (file_put_contents($absolutePath, $raw, LOCK_EX) === false) {
+                    throw new RuntimeException('Unable to write Sorsa raw payload.');
+                }
+                $retrievedAt = gmdate('c');
                 $rawStmt = $this->pdo->prepare('INSERT INTO raw_ingestion_records (source_id, external_key, request_url, retrieved_at, http_status, content_type, content_hash, payload_path, parser_version, parse_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-                $rawStmt->execute([$sourceId, $hash, $endpoint, gmdate('c'), 200, 'application/json', $hash, $relativePath, 'sorsa-search-v1', 'parsed', gmdate('c')]);
+                $rawStmt->execute([$sourceId, $batchDate . ':' . ($ordinal + 1), $endpoint, $retrievedAt, $response['http_status'], $response['content_type'] !== '' ? $response['content_type'] : null, $hash, $relativePath, 'sorsa-search-v1', 'parsed', $retrievedAt]);
                 $rawId = (int) $this->pdo->lastInsertId();
                 $this->pdo->prepare('UPDATE sorsa_batch_queries SET raw_record_id = ? WHERE id = ?')->execute([$rawId, $queryId]);
                 $seen = [];
@@ -106,11 +143,10 @@ final class SorsaBatchRunner
                     }
                     $seen[$key] = true;
                     $batchSeen[$key] = true;
-                    $sourceId = $this->sourceId($endpoint);
                     $exists = $this->pdo->prepare('SELECT id FROM discovery_candidates WHERE source_id = ? AND external_key = ?');
                     $exists->execute([$sourceId, $key]);
                     $wasExisting = $exists->fetchColumn() !== false;
-                    $this->pdo->prepare('INSERT INTO discovery_candidates (source_id, external_key, post_url, author_handle, text, posted_at, engagement_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(source_id, external_key) DO UPDATE SET post_url = excluded.post_url, author_handle = excluded.author_handle, text = excluded.text, posted_at = excluded.posted_at, engagement_json = excluded.engagement_json, updated_at = excluded.updated_at')->execute([$sourceId, $key, $record['post_url'], $record['author_handle'], $record['text'], $record['posted_at'], json_encode($record['engagement'], JSON_UNESCAPED_SLASHES), 'unreviewed', gmdate('c'), gmdate('c')]);
+                    $this->pdo->prepare('INSERT INTO discovery_candidates (source_id, external_key, post_url, author_handle, text, posted_at, engagement_json, raw_record_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(source_id, external_key) DO UPDATE SET post_url = excluded.post_url, author_handle = excluded.author_handle, text = excluded.text, posted_at = excluded.posted_at, engagement_json = excluded.engagement_json, raw_record_id = excluded.raw_record_id, updated_at = excluded.updated_at')->execute([$sourceId, $key, $record['post_url'], $record['author_handle'], $record['text'], $record['posted_at'], json_encode($record['engagement'], JSON_UNESCAPED_SLASHES), $rawId, 'unreviewed', gmdate('c'), gmdate('c')]);
                     $wasExisting ? $updatedCount++ : $newCount++;
                 }
                 $queryFinished = gmdate('c');

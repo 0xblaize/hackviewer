@@ -13,7 +13,7 @@ $pageTitle = $pageTitle ?? 'Hackview';
     <div class="app-shell">
         <header class="topbar">
             <a class="brand" href="/" aria-label="Hackview home"><span class="brand-mark">H</span><span>hackview<span class="brand-dot">.</span></span></a>
-            <div class="topbar-meta"><span class="live-dot"></span> Tracking verified opportunities <span class="meta-separator">·</span> UTC</div>
+            <div class="topbar-meta"><span class="live-dot"></span> Tracking verified opportunities <span class="meta-separator">·</span> <a href="/candidates">Review candidates</a> <span class="meta-separator">·</span> UTC</div>
         </header>
         <main><?= $content ?></main>
         <footer class="footer"><span>Built for people who want to find the right room before it gets crowded.</span><span>Sources are always linked and freshness is visible.</span></footer>

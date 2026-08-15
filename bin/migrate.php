@@ -11,7 +11,20 @@ $migrationDirectory = dirname(__DIR__) . '/database/migrations';
 $files = glob($migrationDirectory . DIRECTORY_SEPARATOR . '*.sql') ?: [];
 sort($files, SORT_STRING);
 foreach ($files as $file) {
-    $pdo->exec((string) file_get_contents($file));
+    $sql = (string) file_get_contents($file);
+    foreach (preg_split('/;\s*(?:\r?\n|$)/', $sql) ?: [] as $statement) {
+        $statement = trim($statement);
+        if ($statement === '') {
+            continue;
+        }
+        try {
+            $pdo->exec($statement);
+        } catch (PDOException $error) {
+            if (!str_contains(strtolower($error->getMessage()), 'duplicate column name')) {
+                throw $error;
+            }
+        }
+    }
 }
 $now = gmdate('c');
 $stmt = $pdo->prepare('INSERT OR IGNORE INTO sources (source_key, name, kind, base_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)');

@@ -61,7 +61,8 @@ if (!preg_match('/^[a-zA-Z0-9.:-]+$/', $host) || !preg_match('/^[0-9]{1,5}$/', $
 $root = __DIR__;
 $public = $root . DIRECTORY_SEPARATOR . 'public';
 $php = PHP_BINARY;
-$commandLine = escapeshellarg($php) . ' -S ' . escapeshellarg($host . ':' . $port) . ' -t ' . escapeshellarg($public);
+$router = $public . DIRECTORY_SEPARATOR . 'index.php';
+$commandLine = escapeshellarg($php) . ' -S ' . escapeshellarg($host . ':' . $port) . ' -t ' . escapeshellarg($public) . ' ' . escapeshellarg($router);
 
 fwrite(STDOUT, "Hackview server running at http://{$host}:{$port}\n");
  passthru($commandLine, $exitCode);

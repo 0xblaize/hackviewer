@@ -18,7 +18,7 @@ final class HackathonRepository
 
     public function search(array $filters): array
     {
-        $conditions = ["h.verification_status != 'rejected'"];
+        $conditions = ["h.verification_status = 'verified'"];
         $params = [];
 
         if (($filters['q'] ?? '') !== '') {
@@ -74,7 +74,7 @@ final class HackathonRepository
 
     public function find(int $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT h.*, s.name AS source_name, s.base_url AS source_base_url FROM hackathons h LEFT JOIN sources s ON s.id = h.source_id WHERE h.id = :id LIMIT 1');
+        $stmt = $this->pdo->prepare("SELECT h.*, s.name AS source_name, s.base_url AS source_base_url FROM hackathons h LEFT JOIN sources s ON s.id = h.source_id WHERE h.id = :id AND h.verification_status = 'verified' LIMIT 1");
         $stmt->execute(['id' => $id]);
         $row = $stmt->fetch();
         return $row ?: null;

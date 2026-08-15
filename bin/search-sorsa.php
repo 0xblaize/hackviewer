@@ -33,21 +33,21 @@ $runId = (int) $pdo->lastInsertId();
 
 try {
     $adapter = new SorsaSearchAdapter($apiKey, $query, $endpoint, $queryField);
-    $records = iterator_to_array($adapter->fetch());
-    $raw = json_encode($records, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    if ($raw === false) {
-        throw new RuntimeException('Unable to encode Sorsa records.');
-    }
+    $response = $adapter->fetchResponse();
+    $records = $response['records'];
+    $raw = $response['raw_body'];
     $hash = hash('sha256', $raw);
     $relativePath = 'sorsa-search/' . gmdate('Ymd-His') . '-' . $hash . '.json';
     $absolutePath = appRoot() . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'raw' . DIRECTORY_SEPARATOR . $relativePath;
-    if (!is_dir(dirname($absolutePath))) {
-        mkdir(dirname($absolutePath), 0775, true);
+    if (!is_dir(dirname($absolutePath)) && !mkdir(dirname($absolutePath), 0775, true) && !is_dir(dirname($absolutePath))) {
+        throw new RuntimeException('Unable to create Sorsa raw payload directory.');
     }
-    file_put_contents($absolutePath, $raw, LOCK_EX);
+    if (file_put_contents($absolutePath, $raw, LOCK_EX) === false) {
+        throw new RuntimeException('Unable to write Sorsa raw payload.');
+    }
 
     $rawStmt = $pdo->prepare('INSERT INTO raw_ingestion_records (source_id, external_key, request_url, retrieved_at, http_status, content_type, content_hash, payload_path, parser_version, parse_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-    $rawStmt->execute([$sourceId, $hash, $endpoint, $now, 200, 'application/json', $hash, $relativePath, 'sorsa-search-v1', 'parsed', $now]);
+    $rawStmt->execute([$sourceId, $hash, $endpoint, $now, $response['http_status'], $response['content_type'] !== '' ? $response['content_type'] : null, $hash, $relativePath, 'sorsa-search-v1', 'parsed', $now]);
     $rawId = (int) $pdo->lastInsertId();
 
     $candidateStmt = $pdo->prepare('INSERT INTO discovery_candidates (source_id, external_key, post_url, author_handle, text, posted_at, engagement_json, raw_record_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(source_id, external_key) DO UPDATE SET post_url = excluded.post_url, author_handle = excluded.author_handle, text = excluded.text, posted_at = excluded.posted_at, engagement_json = excluded.engagement_json, raw_record_id = excluded.raw_record_id, updated_at = excluded.updated_at');
