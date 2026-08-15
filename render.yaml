@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: hackview
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: APP_TIMEZONE
+        value: UTC
+      - key: DATABASE_PATH
+        value: /var/www/html/database/app.sqlite
+      - key: REVIEW_USERNAME
+        sync: false
+      - key: REVIEW_PASSWORD
+        sync: false
+      - key: SORSA_API_KEY
+        sync: false
+      - key: SORSA_SEARCH_ENDPOINT_URL
+        value: https://api.sorsa.io/v3/search-tweets
+      - key: SORSA_SEARCH_QUERY_FIELD
+        value: query
+      - key: SORSA_BATCH_QUERIES
+        value: '["hackathon","buildathon","hackathon prizes"]'

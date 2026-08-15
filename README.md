@@ -80,27 +80,29 @@ php -S 127.0.0.1:8000 -t public public/index.php
 
 Open the displayed address in your browser. The dashboard intentionally starts with an honest empty state until real records are ingested.
 
-## Deploy to Vercel
+## Deploy with Render
 
-Vercel detects the project through `vercel.json` and the PHP function at `api/index.php`. PHP uses Vercel's maintained community runtime `vercel-php`; it is not an official first-party Vercel runtime.
+Hackview is a traditional PHP/SQLite web application, so the recommended deployment is the included Docker/Apache setup on Render rather than a serverless PHP runtime.
 
-Connect the repository in Vercel and deploy with the project root as the **Root Directory**. Do not set a Node.js build command. The included configuration handles PHP requests and `/assets/*` files.
+1. Push this repository to GitHub.
+2. Open Render and choose **New → Blueprint**.
+3. Select this repository. Render will detect `render.yaml`.
+4. Add the secret values requested by Render:
+   - `REVIEW_USERNAME`
+   - `REVIEW_PASSWORD`
+   - `SORSA_API_KEY`
+5. Deploy and open the generated `.onrender.com` URL.
 
-Add these Vercel environment variables before deploying:
+The repository includes:
 
-```env
-APP_TIMEZONE=UTC
-REVIEW_USERNAME=reviewer
-REVIEW_PASSWORD=replace-with-a-long-random-password
-SORSA_API_KEY=your-rotated-sorsa-key
-SORSA_SEARCH_ENDPOINT_URL=https://api.sorsa.io/v3/search-tweets
-SORSA_SEARCH_QUERY_FIELD=query
-SORSA_BATCH_QUERIES=["hackathon","buildathon","hackathon prizes"]
-```
+- `Dockerfile` with PHP 8.3, Apache, PDO SQLite, and URL rewriting
+- `public/.htaccess` for dashboard routes
+- `render.yaml` with health checks and environment variables
+- `.dockerignore` to keep secrets and local databases out of the image
 
-Vercel's filesystem is ephemeral. When running there without `DATABASE_PATH`, Hackview uses `/tmp/hackview.sqlite` and bootstraps the schema automatically, but records can disappear when the function instance is replaced. This is suitable for a temporary empty deployment, not durable production data. A persistent deployment requires replacing the SQLite connection with a hosted database and adapting the migrations.
+Render's free filesystem is ephemeral. For durable production data, use a persistent disk or migrate SQLite to a hosted database before relying on stored candidates and hackathons long-term. Keep the Sorsa batch on Windows Task Scheduler, cron, or another external scheduler.
 
-Vercel also does not run `php artisan sorsa:batch` at midnight. Keep the existing Windows Task Scheduler or cron job on a persistent machine, or connect an external scheduler to an authenticated batch endpoint before relying on daily ingestion.
+The old Vercel files remain for reference, but Vercel's community PHP runtime is not recommended for this Apache-style application because PHP source files may be served instead of executed depending on project routing.
 
 ## Database commands
 
