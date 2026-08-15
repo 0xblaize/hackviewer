@@ -31,4 +31,7 @@ foreach ($migrationFiles as $migrationFile) {
 }
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($path === '/api' || $path === '/api/index.php') {
+    $path = '/';
+}
 (new App\Router())->dispatch(rtrim($path, '/') ?: '/');
