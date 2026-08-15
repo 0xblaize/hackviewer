@@ -15,8 +15,8 @@ final class VerificationService
     public function verify(int $id, string $url): string
     {
         $now = gmdate('c');
-        if (filter_var($url, FILTER_VALIDATE_URL) === false || !str_starts_with(strtolower($url), 'https://')) {
-            $this->check($id, 'official_page', 'fail', $url, 'The official URL must be a valid HTTPS URL.', $now);
+        if (!$this->isSafeHttpsUrl($url)) {
+            $this->check($id, 'official_page', 'fail', $url, 'The official URL must be a public HTTPS URL without credentials or private-network destinations.', $now);
             $this->setStatus($id, 'rejected', null);
             return 'rejected';
         }
@@ -34,8 +34,8 @@ final class VerificationService
         $contentType = $this->contentType($http_response_header ?? []);
         if ($status >= 300 && $status < 400) {
             $location = $this->headerValue($http_response_header ?? [], 'location');
-            if ($location === '' || !str_starts_with(strtolower($location), 'https://')) {
-                $this->check($id, 'official_page', 'fail', $url, 'Redirect did not remain on HTTPS.', $now);
+            if ($location === '' || !$this->isSafeHttpsUrl($location)) {
+                $this->check($id, 'official_page', 'fail', $url, 'Redirect did not remain on a public HTTPS destination.', $now);
                 $this->setStatus($id, 'rejected', null);
                 return 'rejected';
             }
@@ -64,6 +64,27 @@ final class VerificationService
         $this->check($id, 'official_page', 'pass', $url, $excerpt, $now);
         $this->setStatus($id, 'verified', $now);
         return 'verified';
+    }
+
+    private function isSafeHttpsUrl(string $url): bool
+    {
+        if (filter_var($url, FILTER_VALIDATE_URL) === false || strtolower((string) parse_url($url, PHP_URL_SCHEME)) !== 'https') {
+            return false;
+        }
+        $host = (string) parse_url($url, PHP_URL_HOST);
+        if ($host === '' || parse_url($url, PHP_URL_USER) !== null || parse_url($url, PHP_URL_PASS) !== null) {
+            return false;
+        }
+        if (strcasecmp($host, 'localhost') === 0 || str_ends_with(strtolower($host), '.localhost') || str_ends_with(strtolower($host), '.local')) {
+            return false;
+        }
+        $addresses = filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : (gethostbynamel($host) ?: []);
+        foreach ($addresses as $address) {
+            if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private function check(int $id, string $type, string $result, ?string $url, string $excerpt, string $now): void

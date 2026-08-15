@@ -18,6 +18,7 @@ final class HackathonRepository
 
     public function search(array $filters): array
     {
+        $this->refreshStatuses();
         $conditions = ["h.verification_status = 'verified'"];
         $params = [];
 
@@ -38,7 +39,7 @@ final class HackathonRepository
             $params['source'] = $filters['source'];
         }
         if (($filters['horizon'] ?? '') !== '') {
-            $conditions[] = 'h.end_at_utc IS NOT NULL AND h.end_at_utc <= :horizon';
+            $conditions[] = 'COALESCE(h.registration_deadline_utc, h.end_at_utc) IS NOT NULL AND COALESCE(h.registration_deadline_utc, h.end_at_utc) <= :horizon';
             $params['horizon'] = gmdate('c', time() + ((int) $filters['horizon'] * 86400));
         }
 
@@ -58,16 +59,17 @@ final class HackathonRepository
     public function options(): array
     {
         return [
-            'types' => $this->pdo->query("SELECT DISTINCT hackathon_type FROM hackathons WHERE hackathon_type IS NOT NULL AND hackathon_type != '' ORDER BY hackathon_type")->fetchAll(PDO::FETCH_COLUMN),
-            'sources' => $this->pdo->query("SELECT DISTINCT platform_name FROM hackathons WHERE platform_name IS NOT NULL AND platform_name != '' ORDER BY platform_name")->fetchAll(PDO::FETCH_COLUMN),
+            'types' => $this->pdo->query("SELECT DISTINCT hackathon_type FROM hackathons WHERE verification_status = 'verified' AND hackathon_type IS NOT NULL AND hackathon_type != '' ORDER BY hackathon_type")->fetchAll(PDO::FETCH_COLUMN),
+            'sources' => $this->pdo->query("SELECT DISTINCT platform_name FROM hackathons WHERE verification_status = 'verified' AND platform_name IS NOT NULL AND platform_name != '' ORDER BY platform_name")->fetchAll(PDO::FETCH_COLUMN),
         ];
     }
 
     public function summary(): array
     {
+        $this->refreshStatuses();
         return [
             'verified' => (int) $this->pdo->query("SELECT COUNT(*) FROM hackathons WHERE verification_status = 'verified' AND status != 'closed'")->fetchColumn(),
-            'ending' => (int) $this->pdo->query("SELECT COUNT(*) FROM hackathons WHERE status != 'closed' AND end_at_utc IS NOT NULL AND end_at_utc <= datetime('now', '+7 days')")->fetchColumn(),
+            'ending' => (int) $this->pdo->query("SELECT COUNT(*) FROM hackathons WHERE verification_status = 'verified' AND status != 'closed' AND end_at_utc IS NOT NULL AND datetime(end_at_utc) <= datetime('now', '+7 days')")->fetchColumn(),
             'sources' => (int) $this->pdo->query("SELECT COUNT(*) FROM sources WHERE enabled = 1")->fetchColumn(),
         ];
     }
@@ -92,5 +94,15 @@ final class HackathonRepository
         $stmt = $this->pdo->prepare('SELECT * FROM verification_checks WHERE hackathon_id = :id ORDER BY checked_at DESC');
         $stmt->execute(['id' => $id]);
         return $stmt->fetchAll();
+    }
+
+    private function refreshStatuses(): void
+    {
+        $this->pdo->exec("UPDATE hackathons SET status = CASE
+            WHEN end_at_utc IS NOT NULL AND datetime(end_at_utc) < datetime('now') THEN 'closed'
+            WHEN start_at_utc IS NOT NULL AND datetime(start_at_utc) > datetime('now') THEN 'upcoming'
+            WHEN end_at_utc IS NOT NULL AND datetime(end_at_utc) >= datetime('now') THEN 'active'
+            ELSE status
+        END WHERE verification_status = 'verified'");
     }
 }

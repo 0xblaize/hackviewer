@@ -80,6 +80,28 @@ php -S 127.0.0.1:8000 -t public public/index.php
 
 Open the displayed address in your browser. The dashboard intentionally starts with an honest empty state until real records are ingested.
 
+## Deploy to Vercel
+
+Vercel detects the project through `vercel.json` and the PHP function at `api/index.php`. PHP uses Vercel's maintained community runtime `vercel-php`; it is not an official first-party Vercel runtime.
+
+Connect the repository in Vercel and deploy with the project root as the **Root Directory**. Do not set a Node.js build command. The included configuration handles PHP requests and `/assets/*` files.
+
+Add these Vercel environment variables before deploying:
+
+```env
+APP_TIMEZONE=UTC
+REVIEW_USERNAME=reviewer
+REVIEW_PASSWORD=replace-with-a-long-random-password
+SORSA_API_KEY=your-rotated-sorsa-key
+SORSA_SEARCH_ENDPOINT_URL=https://api.sorsa.io/v3/search-tweets
+SORSA_SEARCH_QUERY_FIELD=query
+SORSA_BATCH_QUERIES=["hackathon","buildathon","hackathon prizes"]
+```
+
+Vercel's filesystem is ephemeral. When running there without `DATABASE_PATH`, Hackview uses `/tmp/hackview.sqlite` and bootstraps the schema automatically, but records can disappear when the function instance is replaced. This is suitable for a temporary empty deployment, not durable production data. A persistent deployment requires replacing the SQLite connection with a hosted database and adapting the migrations.
+
+Vercel also does not run `php artisan sorsa:batch` at midnight. Keep the existing Windows Task Scheduler or cron job on a persistent machine, or connect an external scheduler to an authenticated batch endpoint before relying on daily ingestion.
+
 ## Database commands
 
 Run or re-run the database setup:
@@ -92,6 +114,12 @@ Check unreviewed records with the current verification command:
 
 ```bash
 php bin/verify.php
+```
+
+Run the dependency-free feature checks:
+
+```bash
+php tests/run.php
 ```
 
 Remove old raw ingestion database records:
@@ -324,6 +352,8 @@ bin/
   verify.php         Run verification checks
   register-sorsa-task.ps1  Register/remove midnight Sorsa task
   prune.php          Remove old raw database records
+tests/
+  run.php            Run dependency-free feature checks
 public/
   index.php          Web front controller
   assets/            CSS and JavaScript

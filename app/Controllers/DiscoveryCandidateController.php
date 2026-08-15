@@ -16,6 +16,9 @@ final class DiscoveryCandidateController
 
     public function index(): void
     {
+        if (!\requireReviewAuth()) {
+            return;
+        }
         $candidates = $this->repository->all();
         $pageTitle = 'Review candidates';
         require \appRoot() . '/app/Views/discovery-candidates.php';
@@ -23,6 +26,9 @@ final class DiscoveryCandidateController
 
     public function show(int $id): void
     {
+        if (!\requireReviewAuth()) {
+            return;
+        }
         $candidate = $this->repository->find($id);
         if (!$candidate) {
             http_response_code(404);
@@ -36,6 +42,9 @@ final class DiscoveryCandidateController
 
     public function reject(int $id): void
     {
+        if (!\requireReviewAuth()) {
+            return;
+        }
         try {
             \verifyCsrfToken($_POST['csrf_token'] ?? null);
             $this->service->reject($id, trim((string) ($_POST['review_note'] ?? '')));
@@ -51,6 +60,9 @@ final class DiscoveryCandidateController
 
     public function convert(int $id): void
     {
+        if (!\requireReviewAuth()) {
+            return;
+        }
         try {
             \verifyCsrfToken($_POST['csrf_token'] ?? null);
             $hackathonId = $this->service->convert($id, $_POST);
