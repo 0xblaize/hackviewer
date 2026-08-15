@@ -102,7 +102,29 @@ The repository includes:
 
 Render's free filesystem is ephemeral. For durable production data, use a persistent disk or migrate SQLite to a hosted database before relying on stored candidates and hackathons long-term. Keep the Sorsa batch on Windows Task Scheduler, cron, or another external scheduler.
 
-The old Vercel files remain for reference, but Vercel's community PHP runtime is not recommended for this Apache-style application because PHP source files may be served instead of executed depending on project routing.
+The old Vercel PHP files remain for reference, but Vercel's community PHP runtime is not recommended for this Apache-style application because PHP source files may be served instead of executed depending on project routing.
+
+## Deploy the Next.js frontend to Vercel
+
+The Vercel deployment should use `frontend/` as the project root. The Next.js frontend talks to the PHP API through its same-origin backend-for-frontend route, so PHP credentials remain server-side.
+
+1. Create a Vercel project from this repository.
+2. Set **Root Directory** to `frontend`.
+3. Add these environment variables in Vercel:
+   - `PHP_API_BASE_URL`: the deployed PHP API origin, without `/api/v1`.
+   - `PHP_REVIEW_API_TOKEN`: the same long random token as the PHP host's `REVIEW_API_TOKEN`.
+   - `NEXT_PUBLIC_APP_URL`: the public Vercel origin, used for server-rendered API reads.
+   - `NEXT_PUBLIC_APP_NAME`: `Hackview`.
+4. Deploy and confirm `/`, `/hackathons/{id}`, and `/candidates` load through the PHP API.
+
+For local development, copy `frontend/.env.example` to `frontend/.env.local`, start PHP on port 8013, set `PHP_API_BASE_URL=http://127.0.0.1:8013`, then run:
+
+```bash
+npm --prefix frontend install
+npm --prefix frontend run dev
+```
+
+Candidate review requests are authenticated by the server-side bearer token. Do not prefix that token with `NEXT_PUBLIC_` or expose it in browser code.
 
 ## Database commands
 
