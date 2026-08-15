@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 $root = dirname(__DIR__);
-if (getenv('VERCEL') !== false && getenv('DATABASE_PATH') === false) {
+if (getenv('VERCEL') !== false) {
     putenv('DATABASE_PATH=/tmp/hackview.sqlite');
 }
 
