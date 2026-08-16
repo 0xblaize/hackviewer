@@ -63,6 +63,8 @@ function config(string $key, mixed $default = null): mixed
             'mlh_endpoint_url',
             'hackerearth_endpoint_url',
             'kaggle_endpoint_url',
+            'kaggle_username',
+            'kaggle_api_key',
             'hackquest_endpoint_url',
             'unstop_endpoint_url',
         ];

@@ -26,11 +26,26 @@ final class JsonAdapter implements SourceAdapter
             throw new RuntimeException('Source endpoints must use HTTPS.');
         }
 
+        $method = strtoupper((string) ($this->mapping['method'] ?? 'GET'));
+        $headers = [
+            'Accept: application/json',
+            'User-Agent: Hackview/0.1 (+source-attributed discovery)',
+        ];
+        $auth = $this->mapping['basic_auth'] ?? null;
+        if (is_array($auth) && ($auth['username'] ?? '') !== '' && ($auth['password'] ?? '') !== '') {
+            $headers[] = 'Authorization: Basic ' . base64_encode($auth['username'] . ':' . $auth['password']);
+        }
+        $requestBody = null;
+        if ($method !== 'GET') {
+            $requestBody = json_encode($this->mapping['payload'] ?? [], JSON_THROW_ON_ERROR);
+            $headers[] = 'Content-Type: application/json';
+        }
         $context = stream_context_create(['http' => [
-            'method' => 'GET',
+            'method' => $method,
             'timeout' => 20,
             'ignore_errors' => true,
-            'header' => "Accept: application/json\r\nUser-Agent: Hackview/0.1 (+source-attributed discovery)\r\n",
+            'header' => implode("\r\n", $headers) . "\r\n",
+            'content' => $requestBody,
         ]]);
         $payload = @file_get_contents($this->endpoint, false, $context);
         $status = $this->responseStatus($http_response_header ?? []);
@@ -45,12 +60,7 @@ final class JsonAdapter implements SourceAdapter
 
         $items = $this->valueAt($decoded, (string) ($this->mapping['items_path'] ?? ''));
         if (!is_array($items)) {
-            foreach (['data', 'items', 'events', 'results'] as $key) {
-                if (isset($decoded[$key]) && is_array($decoded[$key])) {
-                    $items = $decoded[$key];
-                    break;
-                }
-            }
+            $items = $this->findItems($decoded);
         }
         if (!is_array($items)) {
             throw new RuntimeException('JSON source item collection was not found. Configure items_path.');
@@ -96,6 +106,27 @@ final class JsonAdapter implements SourceAdapter
             }
         }
         return 0;
+    }
+
+    private function findItems(array $data): ?array
+    {
+        $preferred = ['data', 'items', 'events', 'results', 'opportunities', 'hackathons', 'competitions'];
+        foreach ($preferred as $key) {
+            if (!array_key_exists($key, $data)) {
+                continue;
+            }
+            $value = $data[$key];
+            if (is_array($value) && ($value === [] || array_is_list($value))) {
+                return $value;
+            }
+            if (is_array($value)) {
+                $nested = $this->findItems($value);
+                if ($nested !== null) {
+                    return $nested;
+                }
+            }
+        }
+        return array_is_list($data) ? $data : null;
     }
 
     private function valueAt(array $data, string $path): mixed

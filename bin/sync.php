@@ -47,7 +47,7 @@ foreach ($sources as $key => $source) {
         $path = strtolower((string) (parse_url($endpoint, PHP_URL_PATH) ?? ''));
         $adapter = str_ends_with($path, '.xml')
             ? new RssAdapter($key, $endpoint)
-            : new JsonAdapter($key, $endpoint, ['items_path' => '']);
+            : new JsonAdapter($key, $endpoint, array_merge(['items_path' => ''], (array) ($source['request'] ?? [])));
         $count = $persister->ingest($key, (string) $source['name'], (string) $source['kind'], $endpoint, $adapter->fetch());
         $updated += $count;
         $refreshed = true;

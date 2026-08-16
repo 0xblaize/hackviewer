@@ -26,6 +26,10 @@ services:
         sync: false
       - key: KAGGLE_ENDPOINT_URL
         sync: false
+      - key: KAGGLE_USERNAME
+        sync: false
+      - key: KAGGLE_API_KEY
+        sync: false
       - key: HACKQUEST_ENDPOINT_URL
         sync: false
       - key: UNSTOP_ENDPOINT_URL
