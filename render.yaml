@@ -18,12 +18,32 @@ services:
         sync: false
       - key: X_BEARER_TOKEN
         sync: false
+      - key: X_API_BASE_URL
+        value: https://api.x.com/2
+      - key: X_SEARCH_QUERY
+        value: '(hackathon OR hackathons OR buildathon) -is:retweet lang:en'
+      - key: DEVPOST_ENDPOINT_URL
+        sync: false
+      - key: DORAHACKS_ENDPOINT_URL
+        sync: false
+      - key: MLH_ENDPOINT_URL
+        sync: false
+      - key: HACKEREARTH_ENDPOINT_URL
+        sync: false
+      - key: KAGGLE_ENDPOINT_URL
+        sync: false
+      - key: HACKQUEST_ENDPOINT_URL
+        sync: false
+      - key: UNSTOP_ENDPOINT_URL
+        sync: false
       - key: SORSA_API_KEY
         sync: false
       - key: SORSA_API_BASE_URL
         value: https://api.sorsa.io/v3
       - key: SORSA_SEARCH_ENDPOINT_URL
         value: https://api.sorsa.io/v3/search-tweets
+      - key: SORSA_SEARCH_QUERY
+        value: hackathon
       - key: SORSA_SEARCH_QUERY_FIELD
         value: query
       - key: SORSA_BATCH_QUERIES
