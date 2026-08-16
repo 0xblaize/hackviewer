@@ -7,6 +7,7 @@ require_once dirname(__DIR__) . '/app/Bootstrap.php';
 use App\Database;
 use App\Services\DiscoveryPersister;
 use App\Services\SorsaBatchRunner;
+use App\Services\SorsaPromotionService;
 use App\Services\VerificationService;
 use App\Sources\JsonAdapter;
 use App\Sources\RssAdapter;
@@ -83,6 +84,16 @@ if ($apiKey !== '') {
 }
 
 if ($refreshed || $force) {
+    $candidateRepository = new App\Repositories\DiscoveryCandidateRepository($pdo);
+    $promotionCount = (new SorsaPromotionService(
+        $candidateRepository,
+        new App\Services\CandidateReviewService($candidateRepository),
+        new VerificationService($pdo)
+    ))->promote();
+    if ($promotionCount > 0) {
+        $updated += $promotionCount;
+        fwrite(STDOUT, "sorsa: promoted {$promotionCount} verified opportunities.\n");
+    }
     $verification = new VerificationService($pdo);
     $verified = 0;
     $rejected = 0;

@@ -19,7 +19,7 @@ final class HackathonRepository
     public function search(array $filters): array
     {
         $this->refreshStatuses();
-        $conditions = ["h.verification_status = 'verified'"];
+        $conditions = ["h.verification_status = 'verified'", "h.status IN ('active', 'upcoming')", "COALESCE(h.registration_deadline_utc, h.end_at_utc) IS NOT NULL", "datetime(COALESCE(h.registration_deadline_utc, h.end_at_utc)) > datetime('now')", "(h.prize_text IS NOT NULL AND h.prize_text != '') OR h.prize_amount_minor IS NOT NULL"];
         $params = [];
 
         if (($filters['q'] ?? '') !== '') {
@@ -68,8 +68,8 @@ final class HackathonRepository
     {
         $this->refreshStatuses();
         return [
-            'verified' => (int) $this->pdo->query("SELECT COUNT(*) FROM hackathons WHERE verification_status = 'verified' AND status != 'closed'")->fetchColumn(),
-            'ending' => (int) $this->pdo->query("SELECT COUNT(*) FROM hackathons WHERE verification_status = 'verified' AND status != 'closed' AND end_at_utc IS NOT NULL AND datetime(end_at_utc) <= datetime('now', '+7 days')")->fetchColumn(),
+            'verified' => (int) $this->pdo->query("SELECT COUNT(*) FROM hackathons WHERE verification_status = 'verified' AND status IN ('active', 'upcoming') AND COALESCE(registration_deadline_utc, end_at_utc) IS NOT NULL AND datetime(COALESCE(registration_deadline_utc, end_at_utc)) > datetime('now') AND ((prize_text IS NOT NULL AND prize_text != '') OR prize_amount_minor IS NOT NULL)")->fetchColumn(),
+            'ending' => (int) $this->pdo->query("SELECT COUNT(*) FROM hackathons WHERE verification_status = 'verified' AND status IN ('active', 'upcoming') AND end_at_utc IS NOT NULL AND datetime(end_at_utc) > datetime('now') AND datetime(end_at_utc) <= datetime('now', '+7 days') AND ((prize_text IS NOT NULL AND prize_text != '') OR prize_amount_minor IS NOT NULL)")->fetchColumn(),
             'sources' => (int) $this->pdo->query("SELECT COUNT(*) FROM sources WHERE enabled = 1")->fetchColumn(),
             'pending_candidates' => (int) $this->pdo->query("SELECT COUNT(*) FROM discovery_candidates WHERE status = 'unreviewed'")->fetchColumn(),
         ];
@@ -77,7 +77,7 @@ final class HackathonRepository
 
     public function find(int $id): ?array
     {
-        $stmt = $this->pdo->prepare("SELECT h.*, s.name AS source_name, s.base_url AS source_base_url FROM hackathons h LEFT JOIN sources s ON s.id = h.source_id WHERE h.id = :id AND h.verification_status = 'verified' LIMIT 1");
+        $stmt = $this->pdo->prepare("SELECT h.*, s.name AS source_name, s.base_url AS source_base_url FROM hackathons h LEFT JOIN sources s ON s.id = h.source_id WHERE h.id = :id AND h.verification_status = 'verified' AND h.status IN ('active', 'upcoming') AND COALESCE(h.registration_deadline_utc, h.end_at_utc) IS NOT NULL AND datetime(COALESCE(h.registration_deadline_utc, h.end_at_utc)) > datetime('now') AND ((h.prize_text IS NOT NULL AND h.prize_text != '') OR h.prize_amount_minor IS NOT NULL) LIMIT 1");
         $stmt->execute(['id' => $id]);
         $row = $stmt->fetch();
         return $row ?: null;

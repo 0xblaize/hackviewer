@@ -30,6 +30,13 @@ final class DiscoveryCandidateRepository
         return $stmt->fetchAll();
     }
 
+    public function sorsaPromotionQueue(int $limit = 100): array
+    {
+        $limit = max(1, min($limit, 200));
+        $stmt = $this->pdo->query("SELECT c.*, s.name AS source_name FROM discovery_candidates c INNER JOIN sources s ON s.id = c.source_id WHERE c.status = 'unreviewed' AND s.source_key = 'sorsa-search' ORDER BY c.posted_at DESC, c.updated_at DESC LIMIT {$limit}");
+        return $stmt->fetchAll();
+    }
+
     public function find(int $id): ?array
     {
         $stmt = $this->pdo->prepare('SELECT c.*, s.name AS source_name, r.payload_path, r.retrieved_at FROM discovery_candidates c LEFT JOIN sources s ON s.id = c.source_id LEFT JOIN raw_ingestion_records r ON r.id = c.raw_record_id WHERE c.id = :id');

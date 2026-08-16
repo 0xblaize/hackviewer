@@ -14,11 +14,28 @@ final class VerificationService
 
     public function verify(int $id, string $url): string
     {
+        $inspection = $this->preflight($url);
+        return $this->recordInspection($id, $inspection);
+    }
+
+    /** @param array{status: string, check_result: string, evidence_url: string, excerpt: string, title: string} $inspection */
+    public function recordInspection(int $id, array $inspection): string
+    {
         $now = gmdate('c');
-        if (!$this->isSafeHttpsUrl($url)) {
-            $this->check($id, 'official_page', 'fail', $url, 'The official URL must be a public HTTPS URL without credentials or private-network destinations.', $now);
+        $this->check($id, 'official_page', $inspection['check_result'], $inspection['evidence_url'], $inspection['excerpt'], $now);
+        if ($inspection['status'] === 'verified') {
+            $this->setStatus($id, 'verified', $now);
+        } elseif ($inspection['status'] === 'rejected') {
             $this->setStatus($id, 'rejected', null);
-            return 'rejected';
+        }
+        return $inspection['status'];
+    }
+
+    /** @return array{status: string, check_result: string, evidence_url: string, excerpt: string, title: string} */
+    public function preflight(string $url): array
+    {
+        if (!$this->isSafeHttpsUrl($url)) {
+            return ['status' => 'rejected', 'check_result' => 'fail', 'evidence_url' => $url, 'excerpt' => 'The official URL must be a public HTTPS URL without credentials or private-network destinations.', 'title' => ''];
         }
 
         $context = stream_context_create(['http' => [
@@ -30,40 +47,30 @@ final class VerificationService
             'header' => "Accept: text/html,application/xhtml+xml\r\nUser-Agent: Hackview/0.1 (+verification)\r\n",
         ]]);
         $body = @file_get_contents($url, false, $context);
-        $status = $this->responseStatus($http_response_header ?? []);
-        $contentType = $this->contentType($http_response_header ?? []);
+        $headers = $http_response_header ?? [];
+        $status = $this->responseStatus($headers);
+        $contentType = $this->contentType($headers);
         if ($status >= 300 && $status < 400) {
-            $location = $this->headerValue($http_response_header ?? [], 'location');
+            $location = $this->headerValue($headers, 'location');
             if ($location === '' || !$this->isSafeHttpsUrl($location)) {
-                $this->check($id, 'official_page', 'fail', $url, 'Redirect did not remain on a public HTTPS destination.', $now);
-                $this->setStatus($id, 'rejected', null);
-                return 'rejected';
+                return ['status' => 'rejected', 'check_result' => 'fail', 'evidence_url' => $url, 'excerpt' => 'Redirect did not remain on a public HTTPS destination.', 'title' => ''];
             }
-            $this->check($id, 'official_page', 'fail', $location, 'Redirect requires a later verification pass at the final HTTPS URL.', $now);
-            return 'unreviewed';
+            return ['status' => 'unreviewed', 'check_result' => 'fail', 'evidence_url' => $location, 'excerpt' => 'Redirect requires a later verification pass at the final HTTPS URL.', 'title' => ''];
         }
         if ($status >= 500 || $status === 0 || $body === false) {
-            $this->check($id, 'official_page', 'retry', $url, "Temporary fetch failure (HTTP {$status}).", $now);
-            return 'unreviewed';
+            return ['status' => 'unreviewed', 'check_result' => 'retry', 'evidence_url' => $url, 'excerpt' => "Temporary fetch failure (HTTP {$status}).", 'title' => ''];
         }
         if ($status < 200 || $status >= 400) {
-            $this->check($id, 'official_page', 'fail', $url, "Official page returned HTTP {$status}.", $now);
-            $this->setStatus($id, 'rejected', null);
-            return 'rejected';
+            return ['status' => 'rejected', 'check_result' => 'fail', 'evidence_url' => $url, 'excerpt' => "Official page returned HTTP {$status}.", 'title' => ''];
         }
         if ($contentType !== '' && !str_contains(strtolower($contentType), 'html')) {
-            $this->check($id, 'official_page', 'fail', $url, "Official URL returned non-HTML content type: {$contentType}.", $now);
-            $this->setStatus($id, 'rejected', null);
-            return 'rejected';
+            return ['status' => 'rejected', 'check_result' => 'fail', 'evidence_url' => $url, 'excerpt' => "Official URL returned non-HTML content type: {$contentType}.", 'title' => ''];
         }
         $title = '';
         if (preg_match('/<title[^>]*>(.*?)<\/title>/is', (string) $body, $matches)) {
             $title = trim(preg_replace('/\s+/', ' ', strip_tags($matches[1])) ?? '');
         }
-        $excerpt = "HTTP {$status}; content type " . ($contentType ?: 'not reported') . ($title !== '' ? "; page title: {$title}" : '');
-        $this->check($id, 'official_page', 'pass', $url, $excerpt, $now);
-        $this->setStatus($id, 'verified', $now);
-        return 'verified';
+        return ['status' => 'verified', 'check_result' => 'pass', 'evidence_url' => $url, 'excerpt' => "HTTP {$status}; content type " . ($contentType ?: 'not reported') . ($title !== '' ? "; page title: {$title}" : ''), 'title' => $title];
     }
 
     private function isSafeHttpsUrl(string $url): bool

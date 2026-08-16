@@ -58,7 +58,8 @@ final class JsonAdapter implements SourceAdapter
             throw new RuntimeException('JSON source response was not valid JSON.');
         }
 
-        $items = $this->valueAt($decoded, (string) ($this->mapping['items_path'] ?? ''));
+        $itemsPath = (string) ($this->mapping['items_path'] ?? '');
+        $items = $itemsPath === '' ? $this->findItems($decoded) : $this->valueAt($decoded, $itemsPath);
         if (!is_array($items)) {
             $items = $this->findItems($decoded);
         }
@@ -75,22 +76,32 @@ final class JsonAdapter implements SourceAdapter
             if ($officialUrl === '' || $title === '' || filter_var($officialUrl, FILTER_VALIDATE_URL) === false) {
                 continue;
             }
+            $start = $this->dateValue($item, 'start_at_utc', 'start_date', 'start');
+            $end = $this->dateValue($item, 'end_at_utc', 'end_date', 'deadline', 'end');
+            if ($this->sourceKey === 'devpost') {
+                [$start, $end] = $this->dateRangeValue($this->stringValue($item, 'submission_period_dates'), $start, $end);
+            }
+            $themes = is_array($item['themes'] ?? null) && isset($item['themes'][0]['name']) ? (string) $item['themes'][0]['name'] : '';
+            $prize = $this->stringValue($item, 'prize_text', 'prize', 'prizes');
+            if ($prize === '' && isset($item['prize_amount']) && is_scalar($item['prize_amount'])) {
+                $prize = trim(strip_tags((string) $item['prize_amount']));
+            }
             yield [
                 'source_event_id' => $this->stringValue($item, 'source_event_id', 'id', 'slug') ?: $officialUrl,
                 'official_url' => $officialUrl,
                 'canonical_url' => $officialUrl,
                 'title' => $title,
-                'organizer_name' => $this->stringValue($item, 'organizer_name', 'organizer', 'host'),
-                'platform_name' => $this->stringValue($item, 'platform_name', 'platform'),
+                'organizer_name' => $this->stringValue($item, 'organizer_name', 'organizer', 'host', 'organization_name'),
+                'platform_name' => $this->stringValue($item, 'platform_name', 'platform') ?: ($this->sourceKey === 'devpost' ? 'Devpost' : ''),
                 'description' => $this->stringValue($item, 'description', 'summary'),
-                'hackathon_type' => $this->stringValue($item, 'hackathon_type', 'type', 'category'),
-                'start_at_utc' => $this->dateValue($item, 'start_at_utc', 'start_date', 'start'),
-                'end_at_utc' => $this->dateValue($item, 'end_at_utc', 'end_date', 'deadline', 'end'),
-                'registration_deadline_utc' => $this->dateValue($item, 'registration_deadline_utc', 'registration_deadline', 'registration_deadline_date'),
+                'hackathon_type' => $this->stringValue($item, 'hackathon_type', 'type', 'category') ?: $themes,
+                'start_at_utc' => $start,
+                'end_at_utc' => $end,
+                'registration_deadline_utc' => $end,
                 'timezone_name' => $this->stringValue($item, 'timezone_name', 'timezone'),
-                'prize_text' => $this->stringValue($item, 'prize_text', 'prize', 'prizes'),
-                'participant_count' => $this->integerValue($item, 'participant_count', 'participants'),
-                'online_or_location' => $this->stringValue($item, 'online_or_location', 'format'),
+                'prize_text' => $prize,
+                'participant_count' => $this->integerValue($item, 'participant_count', 'participants', 'registrations_count'),
+                'online_or_location' => $this->stringValue($item, 'online_or_location', 'format') ?: ($this->sourceKey === 'devpost' ? $this->stringValue((array) ($item['displayed_location'] ?? []), 'location') : ''),
                 'location_text' => $this->stringValue($item, 'location_text', 'location', 'venue'),
                 'source_url' => $this->endpoint,
                 'links' => $this->links($item),
@@ -152,6 +163,23 @@ final class JsonAdapter implements SourceAdapter
             }
         }
         return '';
+    }
+
+    /** @return array{0: ?string, 1: ?string} */
+    private function dateRangeValue(string $value, ?string $start, ?string $end): array
+    {
+        if ($value === '' || ($start !== null && $end !== null)) {
+            return [$start, $end];
+        }
+        if (!preg_match('/([A-Za-z]{3,9})\s+(\d{1,2})\s*[-–]\s*(?:(?:([A-Za-z]{3,9})\s+))?(\d{1,2}),?\s*(20\d{2})/', $value, $match)) {
+            return [$start, $end];
+        }
+        $year = (int) $match[5];
+        $startMonth = date('m', strtotime($match[1] . ' 1 ' . $year));
+        $endMonth = date('m', strtotime(($match[3] !== '' ? $match[3] : $match[1]) . ' 1 ' . $year));
+        $startTime = strtotime(sprintf('%04d-%s-%02d 00:00:00 UTC', $year, $startMonth, (int) $match[2]));
+        $endTime = strtotime(sprintf('%04d-%s-%02d 23:59:59 UTC', $year, $endMonth, (int) $match[4]));
+        return [$start ?? ($startTime === false ? null : gmdate('c', $startTime)), $end ?? ($endTime === false ? null : gmdate('c', $endTime))];
     }
 
     private function dateValue(array $item, string ...$keys): ?string

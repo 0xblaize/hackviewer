@@ -7,6 +7,7 @@ require_once dirname(__DIR__) . '/app/Bootstrap.php';
 use App\Repositories\DiscoveryCandidateRepository;
 use App\Repositories\HackathonRepository;
 use App\Services\CandidateReviewService;
+use App\Services\SorsaPromotionService;
 use App\Services\VerificationService;
 
 $pdo = new PDO('sqlite::memory:');
@@ -55,7 +56,7 @@ $assert($converted['status'] === 'converted', 'candidate conversion marks the ca
 $assert($created->fetchColumn() === 'unreviewed', 'candidate conversion never auto-verifies an event');
 $assert((int) $pdo->query("SELECT COUNT(*) FROM hackathon_links WHERE hackathon_id = {$hackathonId} AND kind = 'discovery'")->fetchColumn() === 1, 'candidate provenance is linked to the hackathon');
 
-$pdo->prepare("INSERT INTO hackathons (source_id, canonical_url, official_url, title, status, verification_status, end_at_utc, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'verified', ?, ?, ?)")->execute([$sourceId, 'https://example.com/events/live', 'https://example.com/events/live', 'Live event', 'active', gmdate('c', time() + 3600), $now, $now]);
+$pdo->prepare("INSERT INTO hackathons (source_id, canonical_url, official_url, title, status, verification_status, end_at_utc, registration_deadline_utc, prize_text, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'verified', ?, ?, ?, ?, ?)")->execute([$sourceId, 'https://example.com/events/live', 'https://example.com/events/live', 'Live event', 'active', gmdate('c', time() + 3600), gmdate('c', time() + 1800), '$1,000', $now, $now]);
 $unreviewed = new HackathonRepository($pdo);
 $listings = $unreviewed->search([]);
 $assert(count($listings) === 1 && $listings[0]['title'] === 'Live event', 'public search excludes unreviewed events');
@@ -80,6 +81,17 @@ $invalidHackathon->execute([$sourceId, 'https://127.0.0.1/private', 'https://127
 $verification = new VerificationService($pdo);
 $result = $verification->verify((int) $pdo->lastInsertId(), 'https://127.0.0.1/private');
 $assert($result === 'rejected', 'verification rejects private-network official URLs');
+
+$sorsaSource = $pdo->prepare('INSERT INTO sources (source_key, name, kind, created_at, updated_at) VALUES (?, ?, ?, ?, ?)');
+$sorsaSource->execute(['sorsa-search', 'Sorsa X search', 'social-api', $now, $now]);
+$sorsaSourceId = (int) $pdo->lastInsertId();
+$promotionCandidate = $pdo->prepare('INSERT INTO discovery_candidates (source_id, external_key, post_url, text, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+$promotionCandidate->execute([$sorsaSourceId, 'sorsa-no-link', 'https://x.com/i/web/status/none', 'A hackathon announcement without an official registration link.', 'unreviewed', $now, $now]);
+$promotionRepository = new DiscoveryCandidateRepository($pdo);
+$promotion = new SorsaPromotionService($promotionRepository, new CandidateReviewService($promotionRepository), new VerificationService($pdo));
+$assert($promotion->promote() === 0, 'Sorsa promotion skips leads without explicit official links');
+$promotionStatus = $pdo->query("SELECT status FROM discovery_candidates WHERE external_key = 'sorsa-no-link'")->fetchColumn();
+$assert($promotionStatus === 'unreviewed', 'skipped Sorsa leads remain unreviewed');
 
 fwrite(STDOUT, "{$passed} passed, {$failed} failed\n");
 exit($failed === 0 ? 0 : 1);
