@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Database;
 use App\Sources\SorsaSearchAdapter;
+use App\Support\UrlNormalizer;
 use DateTimeImmutable;
 use PDO;
 use RuntimeException;
@@ -146,7 +147,8 @@ final class SorsaBatchRunner
                     $exists = $this->pdo->prepare('SELECT id FROM discovery_candidates WHERE source_id = ? AND external_key = ?');
                     $exists->execute([$sourceId, $key]);
                     $wasExisting = $exists->fetchColumn() !== false;
-                    $this->pdo->prepare('INSERT INTO discovery_candidates (source_id, external_key, post_url, author_handle, text, posted_at, engagement_json, raw_record_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(source_id, external_key) DO UPDATE SET post_url = excluded.post_url, author_handle = excluded.author_handle, text = excluded.text, posted_at = excluded.posted_at, engagement_json = excluded.engagement_json, raw_record_id = excluded.raw_record_id, updated_at = excluded.updated_at')->execute([$sourceId, $key, $record['post_url'], $record['author_handle'], $record['text'], $record['posted_at'], json_encode($record['engagement'], JSON_UNESCAPED_SLASHES), $rawId, 'unreviewed', gmdate('c'), gmdate('c')]);
+                    $leadKey = UrlNormalizer::textKey((string) ($record['text'] ?? ''));
+                    $this->pdo->prepare('INSERT INTO discovery_candidates (source_id, external_key, post_url, author_handle, text, posted_at, engagement_json, raw_record_id, lead_key, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(source_id, external_key) DO UPDATE SET post_url = excluded.post_url, author_handle = excluded.author_handle, text = excluded.text, posted_at = excluded.posted_at, engagement_json = excluded.engagement_json, raw_record_id = excluded.raw_record_id, lead_key = excluded.lead_key, updated_at = excluded.updated_at')->execute([$sourceId, $key, $record['post_url'], $record['author_handle'], $record['text'], $record['posted_at'], json_encode($record['engagement'], JSON_UNESCAPED_SLASHES), $rawId, $leadKey, 'unreviewed', gmdate('c'), gmdate('c')]);
                     $wasExisting ? $updatedCount++ : $newCount++;
                 }
                 $queryFinished = gmdate('c');

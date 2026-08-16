@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Database;
+use App\Support\UrlNormalizer;
 use PDO;
 
 final class HackathonRepository
@@ -50,10 +51,10 @@ final class HackathonRepository
             default => 'CASE WHEN h.end_at_utc IS NULL THEN 1 ELSE 0 END, h.end_at_utc ASC',
         };
 
-        $sql = 'SELECT h.*, s.name AS source_name FROM hackathons h LEFT JOIN sources s ON s.id = h.source_id WHERE ' . implode(' AND ', $conditions) . ' ORDER BY ' . $order . ' LIMIT 60';
+        $sql = 'SELECT h.*, s.name AS source_name FROM hackathons h LEFT JOIN sources s ON s.id = h.source_id WHERE ' . implode(' AND ', $conditions) . ' ORDER BY ' . $order . ' LIMIT 200';
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll();
+        return $this->deduplicate($stmt->fetchAll());
     }
 
     public function options(): array
@@ -68,7 +69,7 @@ final class HackathonRepository
     {
         $this->refreshStatuses();
         return [
-            'verified' => (int) $this->pdo->query("SELECT COUNT(*) FROM hackathons WHERE verification_status = 'verified' AND status IN ('active', 'upcoming') AND COALESCE(registration_deadline_utc, end_at_utc) IS NOT NULL AND datetime(COALESCE(registration_deadline_utc, end_at_utc)) > datetime('now') AND ((prize_text IS NOT NULL AND prize_text != '') OR prize_amount_minor IS NOT NULL)")->fetchColumn(),
+            'verified' => count($this->search([])),
             'ending' => (int) $this->pdo->query("SELECT COUNT(*) FROM hackathons WHERE verification_status = 'verified' AND status IN ('active', 'upcoming') AND end_at_utc IS NOT NULL AND datetime(end_at_utc) > datetime('now') AND datetime(end_at_utc) <= datetime('now', '+7 days') AND ((prize_text IS NOT NULL AND prize_text != '') OR prize_amount_minor IS NOT NULL)")->fetchColumn(),
             'sources' => (int) $this->pdo->query("SELECT COUNT(*) FROM sources WHERE enabled = 1")->fetchColumn(),
             'pending_candidates' => (int) $this->pdo->query("SELECT COUNT(*) FROM discovery_candidates WHERE status = 'unreviewed'")->fetchColumn(),
@@ -95,6 +96,24 @@ final class HackathonRepository
         $stmt = $this->pdo->prepare('SELECT * FROM verification_checks WHERE hackathon_id = :id ORDER BY checked_at DESC');
         $stmt->execute(['id' => $id]);
         return $stmt->fetchAll();
+    }
+
+    private function deduplicate(array $rows): array
+    {
+        $seen = [];
+        $result = [];
+        foreach ($rows as $row) {
+            $key = UrlNormalizer::normalize((string) ($row['canonical_key'] ?: $row['canonical_url'] ?: $row['official_url']));
+            if ($key === '' || isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $result[] = $row;
+            if (count($result) >= 60) {
+                break;
+            }
+        }
+        return $result;
     }
 
     private function refreshStatuses(): void

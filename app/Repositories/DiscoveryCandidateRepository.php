@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Database;
+use App\Support\UrlNormalizer;
 use PDO;
 
 final class DiscoveryCandidateRepository
@@ -26,8 +27,33 @@ final class DiscoveryCandidateRepository
     public function publicLeads(int $limit = 30): array
     {
         $limit = max(1, min($limit, 50));
-        $stmt = $this->pdo->query('SELECT c.id, c.source_id, c.external_key, c.post_url, c.author_handle, c.text, c.posted_at, c.status, s.name AS source_name FROM discovery_candidates c LEFT JOIN sources s ON s.id = c.source_id WHERE c.status = \'unreviewed\' ORDER BY c.posted_at DESC, c.updated_at DESC LIMIT ' . $limit);
-        return $stmt->fetchAll();
+        $rows = $this->pdo->query("SELECT c.id, c.source_id, c.external_key, c.post_url, c.author_handle, c.text, c.posted_at, c.status, c.lead_key, s.name AS source_name FROM discovery_candidates c LEFT JOIN sources s ON s.id = c.source_id WHERE c.status = 'unreviewed' AND c.converted_hackathon_id IS NULL ORDER BY c.posted_at DESC, c.updated_at DESC LIMIT 200")->fetchAll();
+        $verifiedKeys = [];
+        foreach ($this->pdo->query("SELECT canonical_key, canonical_url, official_url FROM hackathons WHERE verification_status = 'verified'")->fetchAll() as $hackathon) {
+            $verifiedKeys[UrlNormalizer::normalize((string) ($hackathon['canonical_key'] ?: $hackathon['canonical_url'] ?: $hackathon['official_url']))] = true;
+        }
+        $seen = [];
+        $leads = [];
+        foreach ($rows as $row) {
+            $urls = [];
+            preg_match_all('~https?://[^\\s<>]+~i', (string) $row['text'], $matches);
+            foreach ($matches[0] ?? [] as $url) {
+                $key = UrlNormalizer::normalize(rtrim($url, '.,);'));
+                if ($key !== '' && !preg_match('~(?:^|//)(?:www\\.)?(?:x|twitter)\\.com(?:/|$)~i', $key)) {
+                    $urls[] = $key;
+                }
+            }
+            $identity = $urls[0] ?? (string) ($row['lead_key'] ?: UrlNormalizer::textKey((string) $row['text']));
+            if ($identity !== '' && (isset($verifiedKeys[$identity]) || isset($seen[$identity]))) {
+                continue;
+            }
+            $seen[$identity] = true;
+            $leads[] = $row;
+            if (count($leads) >= $limit) {
+                break;
+            }
+        }
+        return $leads;
     }
 
     public function sorsaPromotionQueue(int $limit = 100): array

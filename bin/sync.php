@@ -33,7 +33,15 @@ function stale(?string $timestamp, int $now, int $maxAge): bool
 
 $sources = SourceRegistry::all();
 foreach ($sources as $key => $source) {
-    if ($source['kind'] === 'discovery' || !$source['configured']) {
+    if ($source['kind'] === 'discovery') {
+        continue;
+    }
+    if ($source['status'] === 'invalid-endpoint') {
+        $failed++;
+        fwrite(STDERR, "{$key}: endpoint must use HTTPS.\n");
+        continue;
+    }
+    if (!$source['configured']) {
         continue;
     }
     $sourceStmt = $pdo->prepare('SELECT last_success_at FROM sources WHERE source_key = ? LIMIT 1');

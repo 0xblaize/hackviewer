@@ -38,14 +38,15 @@ final class SourceRegistry
                 'password' => trim((string) config(strtolower($request['basic_auth']['password']), '')),
             ];
         }
+        $configured = $endpoint !== '' && str_starts_with(strtolower($endpoint), 'https://');
         return [
             'name' => $name,
             'kind' => $kind,
             'endpoint_env' => $endpointEnv,
             'endpoint' => $endpoint,
             'request' => $request,
-            'configured' => $endpoint !== '',
-            'status' => $endpoint === '' ? 'manual-only' : 'configured',
+            'configured' => $configured,
+            'status' => $endpoint === '' ? 'manual-only' : ($configured ? 'configured' : 'invalid-endpoint'),
         ];
     }
 }

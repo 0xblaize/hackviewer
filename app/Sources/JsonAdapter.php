@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Sources;
 
+use App\Support\UrlNormalizer;
 use RuntimeException;
 
 final class JsonAdapter implements SourceAdapter
@@ -89,7 +90,8 @@ final class JsonAdapter implements SourceAdapter
             yield [
                 'source_event_id' => $this->stringValue($item, 'source_event_id', 'id', 'slug') ?: $officialUrl,
                 'official_url' => $officialUrl,
-                'canonical_url' => $officialUrl,
+                'canonical_url' => UrlNormalizer::normalize($officialUrl),
+                'canonical_key' => UrlNormalizer::normalize($officialUrl),
                 'title' => $title,
                 'organizer_name' => $this->stringValue($item, 'organizer_name', 'organizer', 'host', 'organization_name'),
                 'platform_name' => $this->stringValue($item, 'platform_name', 'platform') ?: ($this->sourceKey === 'devpost' ? 'Devpost' : ''),

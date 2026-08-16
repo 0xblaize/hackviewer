@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Sources;
 
+use App\Support\UrlNormalizer;
 use RuntimeException;
 
 final class RssAdapter implements SourceAdapter
@@ -36,7 +37,8 @@ final class RssAdapter implements SourceAdapter
             yield [
                 'source_event_id' => (string) ($item->guid ?? $item->id ?? $link),
                 'official_url' => $link,
-                'canonical_url' => $link,
+                'canonical_url' => UrlNormalizer::normalize($link),
+                'canonical_key' => UrlNormalizer::normalize($link),
                 'title' => trim((string) ($item->title ?? '')),
                 'description' => trim(strip_tags((string) ($item->description ?? $item->summary ?? ''))),
                 'start_at_utc' => null,

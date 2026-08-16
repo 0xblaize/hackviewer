@@ -22,7 +22,7 @@ foreach (array_slice($argv, 1) as $argument) {
 
 if ($list) {
     foreach (SourceRegistry::all() as $key => $source) {
-        fwrite(STDOUT, sprintf("%-12s %-24s %s (%s)\n", $key, $source['name'], $source['status'], $source['endpoint_env']));
+        fwrite(STDOUT, sprintf("%-12s %-24s %-18s %s=%s\n", $key, $source['name'], $source['status'], $source['endpoint_env'], $source['endpoint'] !== '' ? $source['endpoint'] : '<empty>'));
     }
     exit(0);
 }
@@ -44,6 +44,11 @@ foreach ($sources as $key => $source) {
         fwrite(STDOUT, "Skipped {$key}: use its dedicated discovery command.\n");
         continue;
     }
+    if ($source['status'] === 'invalid-endpoint') {
+        $failed++;
+        fwrite(STDERR, "{$key}: endpoint must use HTTPS.\n");
+        continue;
+    }
     if (!$source['configured']) {
         fwrite(STDOUT, "Skipped {$key}: no permitted endpoint configured.\n");
         continue;
@@ -52,7 +57,7 @@ foreach ($sources as $key => $source) {
         $endpoint = (string) $source['endpoint'];
         $adapter = str_ends_with(strtolower(parse_url($endpoint, PHP_URL_PATH) ?? ''), '.xml')
             ? new RssAdapter($key, $endpoint)
-            : new JsonAdapter($key, $endpoint, ['items_path' => '']);
+            : new JsonAdapter($key, $endpoint, array_merge(['items_path' => ''], (array) ($source['request'] ?? [])));
         $count = $persister->ingest($key, $source['name'], $source['kind'], $endpoint, $adapter->fetch());
         fwrite(STDOUT, "{$key}: ingested {$count} unreviewed records.\n");
     } catch (Throwable $error) {
