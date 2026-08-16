@@ -20,6 +20,8 @@ services:
         sync: false
       - key: SORSA_API_KEY
         sync: false
+      - key: SORSA_API_BASE_URL
+        value: https://api.sorsa.io/v3
       - key: SORSA_SEARCH_ENDPOINT_URL
         value: https://api.sorsa.io/v3/search-tweets
       - key: SORSA_SEARCH_QUERY_FIELD
