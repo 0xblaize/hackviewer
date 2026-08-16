@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Repositories\DiscoveryCandidateRepository;
 use App\Repositories\HackathonRepository;
 use App\Services\CountdownService;
 
 final class DashboardController
 {
-    public function __construct(private readonly HackathonRepository $repository, private readonly CountdownService $countdown)
+    public function __construct(private readonly HackathonRepository $repository, private readonly CountdownService $countdown, private readonly DiscoveryCandidateRepository $candidates)
     {
     }
 
@@ -26,6 +27,7 @@ final class DashboardController
         $listings = $this->repository->search($filters);
         $summary = $this->repository->summary();
         $options = $this->repository->options();
+        $leads = $this->candidates->publicLeads();
         $countdown = $this->countdown;
         $pageTitle = 'Find the next worthwhile hackathon';
         require \appRoot() . '/app/Views/dashboard.php';

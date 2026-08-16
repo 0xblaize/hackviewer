@@ -16,12 +16,6 @@ services:
         sync: false
       - key: REVIEW_API_TOKEN
         sync: false
-      - key: X_BEARER_TOKEN
-        sync: false
-      - key: X_API_BASE_URL
-        value: https://api.x.com/2
-      - key: X_SEARCH_QUERY
-        value: '(hackathon OR hackathons OR buildathon) -is:retweet lang:en'
       - key: DEVPOST_ENDPOINT_URL
         sync: false
       - key: DORAHACKS_ENDPOINT_URL

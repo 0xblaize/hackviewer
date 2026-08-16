@@ -71,6 +71,7 @@ final class HackathonRepository
             'verified' => (int) $this->pdo->query("SELECT COUNT(*) FROM hackathons WHERE verification_status = 'verified' AND status != 'closed'")->fetchColumn(),
             'ending' => (int) $this->pdo->query("SELECT COUNT(*) FROM hackathons WHERE verification_status = 'verified' AND status != 'closed' AND end_at_utc IS NOT NULL AND datetime(end_at_utc) <= datetime('now', '+7 days')")->fetchColumn(),
             'sources' => (int) $this->pdo->query("SELECT COUNT(*) FROM sources WHERE enabled = 1")->fetchColumn(),
+            'pending_candidates' => (int) $this->pdo->query("SELECT COUNT(*) FROM discovery_candidates WHERE status = 'unreviewed'")->fetchColumn(),
         ];
     }
 

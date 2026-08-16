@@ -13,7 +13,7 @@ The project is designed for source-attributed discovery. It does not generate pl
 - Verification status and legitimacy notes
 - Public RSS/Atom ingestion
 - Configurable JSON endpoint ingestion
-- Official X API discovery for relevant public posts
+- Sorsa-powered X discovery for relevant public posts
 - Raw source preservation for auditability
 - Separate unreviewed discovery candidates
 - SQLite storage with PHP PDO
@@ -154,31 +154,21 @@ php bin/verify.php
 
 Only connect feeds whose terms, rate limits, robots policy, and attribution requirements you have checked. Ingested events remain unreviewed until verification.
 
-## X discovery
+## Sorsa social discovery
 
-Hackview uses the official X API for automated public-post discovery. It does not use unofficial scrapers, browser extensions, account-cookie extraction, or bypass methods.
+Hackview uses Sorsa as its only automated X/social discovery provider. It does not use unofficial scrapers, browser extensions, account-cookie extraction, or bypass methods.
 
-Add your own authorized token to `.env`:
+Add your Sorsa key to the production environment and configure the documented endpoint:
 
 ```env
-X_BEARER_TOKEN=your_token_here
+SORSA_API_KEY=your_sorsa_key_here
+SORSA_SEARCH_ENDPOINT_URL=https://api.sorsa.io/v3/search-tweets
+SORSA_SEARCH_QUERY_FIELD=query
 ```
 
-Then run:
+Sorsa posts are stored as private discovery candidates, not directly as hackathons. An official event page must be found and checked before it can become a verified listing.
 
-```bash
-php bin/discover-x.php
-```
-
-Use a custom query when needed:
-
-```bash
-php bin/discover-x.php "(hackathon OR buildathon) (prize OR prizes) -is:retweet lang:en"
-```
-
-X posts are stored in `discovery_candidates`, not directly as hackathons. A post is only a lead. An official event page must be found and checked before it can become a verified listing.
-
-### Sorsa X search
+### Sorsa search
 
 Sorsa's documented endpoint is a `POST` request to:
 
@@ -363,7 +353,6 @@ bin/
   migrate.php        Create the SQLite schema
   ingest.php         Ingest a permitted RSS/Atom feed
   discover.php       Run configured platform sources
-  discover-x.php     Discover public X posts
   verify.php         Run verification checks
   register-sorsa-task.ps1  Register/remove midnight Sorsa task
   prune.php          Remove old raw database records
@@ -391,7 +380,7 @@ If port 8000 is busy:
 php artisan serve --port=8010
 ```
 
-If X discovery says `Set X_BEARER_TOKEN in .env`, add a valid token obtained from your own authorized X developer account.
+If Sorsa discovery fails, check that `SORSA_API_KEY`, `SORSA_SEARCH_ENDPOINT_URL`, and `SORSA_SEARCH_QUERY_FIELD` are configured in the production environment.
 
 If a platform shows `manual-only`, leave its endpoint blank until you have a documented, permitted endpoint. This status is safer than silently scraping or guessing.
 

@@ -23,6 +23,13 @@ final class DiscoveryCandidateRepository
         return $stmt->fetchAll();
     }
 
+    public function publicLeads(int $limit = 30): array
+    {
+        $limit = max(1, min($limit, 50));
+        $stmt = $this->pdo->query('SELECT c.id, c.source_id, c.external_key, c.post_url, c.author_handle, c.text, c.posted_at, c.status, s.name AS source_name FROM discovery_candidates c LEFT JOIN sources s ON s.id = c.source_id WHERE c.status = \'unreviewed\' ORDER BY c.posted_at DESC, c.updated_at DESC LIMIT ' . $limit);
+        return $stmt->fetchAll();
+    }
+
     public function find(int $id): ?array
     {
         $stmt = $this->pdo->prepare('SELECT c.*, s.name AS source_name, r.payload_path, r.retrieved_at FROM discovery_candidates c LEFT JOIN sources s ON s.id = c.source_id LEFT JOIN raw_ingestion_records r ON r.id = c.raw_record_id WHERE c.id = :id');

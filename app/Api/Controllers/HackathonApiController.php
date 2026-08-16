@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Api\Controllers;
 
 use App\Api\JsonResponse;
+use App\Repositories\DiscoveryCandidateRepository;
 use App\Repositories\HackathonRepository;
 
 final class HackathonApiController
 {
-    public function __construct(private readonly HackathonRepository $repository)
+    public function __construct(private readonly HackathonRepository $repository, private readonly DiscoveryCandidateRepository $candidates)
     {
     }
 
@@ -27,6 +28,7 @@ final class HackathonApiController
             'items' => $this->repository->search($filters),
             'summary' => $this->repository->summary(),
             'options' => $this->repository->options(),
+            'leads' => $this->candidates->publicLeads(),
         ]);
     }
 

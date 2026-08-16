@@ -14,9 +14,6 @@ function config(string $key, mixed $default = null): mixed
         $config = [
             'database' => appRoot() . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'app.sqlite',
             'timezone' => 'UTC',
-            'x_bearer_token' => null,
-            'x_api_base_url' => 'https://api.x.com/2',
-            'x_search_query' => '(hackathon OR hackathons OR buildathon) -is:retweet lang:en',
             'sorsa_api_key' => null,
             'sorsa_api_base_url' => 'https://api.sorsa.io/v3',
             'sorsa_posts_endpoint_url' => null,
@@ -55,9 +52,6 @@ function config(string $key, mixed $default = null): mixed
             'review_username',
             'review_password',
             'review_api_token',
-            'x_bearer_token',
-            'x_api_base_url',
-            'x_search_query',
             'sorsa_api_key',
             'sorsa_api_base_url',
             'sorsa_search_endpoint_url',
@@ -88,7 +82,6 @@ function config(string $key, mixed $default = null): mixed
         if ($appTimezone !== '') {
             $config['timezone'] = $appTimezone;
         }
-        $config['x_bearer_token'] = $config['x_bearer_token'] ?? getenv('X_BEARER_TOKEN') ?: null;
         $config['sorsa_api_key'] = $config['sorsa_api_key'] ?? getenv('SORSA_API_KEY') ?: null;
         if (isset($config['sorsa_batch_queries']) && is_string($config['sorsa_batch_queries'])) {
             $decodedQueries = json_decode($config['sorsa_batch_queries'], true);

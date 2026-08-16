@@ -50,10 +50,23 @@ export type Candidate = {
   status: string;
 };
 
+export type DiscoveryLead = {
+  id: number;
+  source_id: number;
+  external_key: string;
+  post_url: string;
+  author_handle: string | null;
+  text: string;
+  posted_at: string | null;
+  status: string;
+  source_name: string | null;
+};
+
 export type HackathonResponse = {
   items: Hackathon[];
-  summary: { verified: number; ending: number; sources: number };
+  summary: { verified: number; ending: number; sources: number; pending_candidates: number };
   options: { types: string[]; sources: string[] };
+  leads: DiscoveryLead[];
 };
 
 export type HackathonDetailResponse = {

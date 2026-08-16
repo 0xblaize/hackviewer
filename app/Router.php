@@ -29,7 +29,7 @@ final class Router
             return;
         }
         if ($path === '/' || $path === '') {
-            (new DashboardController($repository, $countdown))->index();
+            (new DashboardController($repository, $countdown, $candidates))->index();
             return;
         }
         if (preg_match('#^/hackathons/(\d+)$#', $path, $matches)) {
@@ -69,7 +69,7 @@ final class Router
             return;
         }
         if ($path === '/api/v1/hackathons' && $_SERVER['REQUEST_METHOD'] === 'GET') {
-            (new HackathonApiController($repository))->index();
+            (new HackathonApiController($repository, $candidates))->index();
             return;
         }
         if (preg_match('#^/api/v1/hackathons/(\d+)$#', $path, $matches) && $_SERVER['REQUEST_METHOD'] === 'GET') {
