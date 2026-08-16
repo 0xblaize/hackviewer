@@ -80,13 +80,19 @@ final class SorsaSearchAdapter
             if ($url === '') {
                 $url = "https://x.com/i/web/status/{$id}";
             }
+            $user = is_array($item['user'] ?? null) ? $item['user'] : [];
             $records[] = [
                 'external_key' => $id,
                 'post_url' => $url,
-                'author_handle' => ltrim((string) ($item['author_username'] ?? $item['username'] ?? $item['handle'] ?? ''), '@'),
+                'author_handle' => ltrim((string) ($item['author_username'] ?? $item['username'] ?? $item['handle'] ?? $user['username'] ?? ''), '@'),
                 'text' => $text,
                 'posted_at' => $item['created_at'] ?? $item['posted_at'] ?? null,
-                'engagement' => is_array($item['public_metrics'] ?? null) ? $item['public_metrics'] : [],
+                'engagement' => is_array($item['public_metrics'] ?? null) ? $item['public_metrics'] : [
+                    'reply_count' => $item['reply_count'] ?? 0,
+                    'retweet_count' => $item['retweet_count'] ?? 0,
+                    'likes_count' => $item['likes_count'] ?? 0,
+                    'view_count' => $item['view_count'] ?? 0,
+                ],
             ];
         }
 

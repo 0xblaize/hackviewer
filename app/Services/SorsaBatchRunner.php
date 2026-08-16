@@ -45,7 +45,7 @@ final class SorsaBatchRunner
 
         $skipOrdinals = [];
         $baseTotals = ['fetched_count' => 0, 'created_count' => 0, 'updated_count' => 0, 'duplicate_count' => 0];
-        $this->pdo->exec('BEGIN IMMEDIATE');
+        $this->pdo->beginTransaction();
         try {
             $existing = $this->pdo->prepare('SELECT * FROM sorsa_batches WHERE batch_date = ?');
             $existing->execute([$batchDate]);
