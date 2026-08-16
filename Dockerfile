@@ -14,10 +14,14 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
     /etc/apache2/conf-available/*.conf
 
 COPY docker/000-default.conf /etc/apache2/sites-available/000-default.conf
+COPY docker/entrypoint.sh /usr/local/bin/hackview-entrypoint
 COPY . /var/www/html/
 
-RUN mkdir -p /var/www/html/database /var/www/html/storage/raw /var/www/html/storage/logs \
+RUN chmod +x /usr/local/bin/hackview-entrypoint \
+    && mkdir -p /var/www/html/database /var/www/html/storage/raw /var/www/html/storage/logs \
     && chown -R www-data:www-data /var/www/html/database /var/www/html/storage \
     && php bin/migrate.php
+
+ENTRYPOINT ["/usr/local/bin/hackview-entrypoint"]
 
 EXPOSE 80

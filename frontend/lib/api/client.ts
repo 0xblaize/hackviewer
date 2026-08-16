@@ -10,5 +10,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   if (!response.ok) {
     throw new Error(body?.error?.message || `Request failed with HTTP ${response.status}`);
   }
+  if (!body || typeof body !== 'object' || !('data' in body)) {
+    throw new Error('The backend returned an invalid API response.');
+  }
   return body.data as T;
 }
