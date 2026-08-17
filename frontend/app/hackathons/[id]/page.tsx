@@ -3,8 +3,19 @@ import { notFound } from 'next/navigation';
 import Countdown from '../../../components/Countdown';
 import { getHackathon } from '../../../lib/api/hackathons';
 import { formatDate, formatPrize } from '../../../lib/formatters';
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  try {
+    const { hackathon } = await getHackathon(id);
+    return { title: hackathon.title, description: hackathon.description || `Application details for ${hackathon.title}.` };
+  } catch {
+    return { title: 'Hackathon details' };
+  }
+}
 
 function findLink(links: { kind: string; url: string; label: string }[], kind: string) {
   return links.find(link => link.kind === kind);
