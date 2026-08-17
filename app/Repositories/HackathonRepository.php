@@ -78,7 +78,7 @@ final class HackathonRepository
 
     public function find(int $id): ?array
     {
-        $stmt = $this->pdo->prepare("SELECT h.*, s.name AS source_name, s.base_url AS source_base_url FROM hackathons h LEFT JOIN sources s ON s.id = h.source_id WHERE h.id = :id AND h.verification_status = 'verified' AND h.status IN ('active', 'upcoming') AND COALESCE(h.registration_deadline_utc, h.end_at_utc) IS NOT NULL AND datetime(COALESCE(h.registration_deadline_utc, h.end_at_utc)) > datetime('now') AND ((h.prize_text IS NOT NULL AND h.prize_text != '') OR h.prize_amount_minor IS NOT NULL) LIMIT 1");
+        $stmt = $this->pdo->prepare("SELECT h.*, s.name AS source_name, s.base_url AS source_base_url FROM hackathons h LEFT JOIN sources s ON s.id = h.source_id WHERE h.id = :id AND h.verification_status = 'verified' LIMIT 1");
         $stmt->execute(['id' => $id]);
         $row = $stmt->fetch();
         return $row ?: null;

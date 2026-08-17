@@ -73,7 +73,7 @@ final class Router
             return;
         }
         if (preg_match('#^/api/v1/hackathons/(\d+)$#', $path, $matches) && $_SERVER['REQUEST_METHOD'] === 'GET') {
-            (new HackathonApiController($repository))->show((int) $matches[1]);
+            (new HackathonApiController($repository, $candidates))->show((int) $matches[1]);
             return;
         }
         if (!$this->validApiToken()) {
