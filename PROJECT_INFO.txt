@@ -1,0 +1,32 @@
+HACKVIEW — PROJECT SUMMARY
+
+Hackview is a real hackathon discovery platform. It helps builders find open,
+verified hackathons and understand how to apply without browsing noisy sources.
+
+STACK
+- PHP 8.3 backend with Apache and SQLite/PDO.
+- Next.js 15 frontend with TypeScript.
+- Render Docker deployment for the PHP service.
+- Sorsa API for social discovery leads.
+- Official JSON/RSS platform sources such as Devpost and Kaggle.
+
+CORE RULES
+- Never create fake hackathons or invented event details.
+- Verified opportunities appear before unverified source leads.
+- Every listing keeps its official source and verification evidence.
+- Duplicate events are normalized and hidden from repeated dashboard cards.
+- Social posts are leads, not proof, until an official page is checked.
+- No AI model or Claude API is used in the product.
+
+MAIN PRODUCT PROMPT
+“Build Hackview as a trustworthy hackathon discovery board. Use real official
+platform data and Sorsa discovery, verify official HTTPS pages, show open
+opportunities first, explain how to apply, keep the interface mobile-friendly,
+and never fabricate missing information.”
+
+SHORT ARTICLE
+Hackview turns scattered hackathon announcements into a focused signal board.
+Users can compare deadlines, prizes, formats, and verification status, then
+open the official registration or rules page. The platform favors clarity over
+volume: incomplete or unverified information remains labeled until it can be
+supported by a legitimate source.
